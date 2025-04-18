@@ -3,6 +3,45 @@ import re
 import html
 import sys
 from utils import safe_read
+import google.generativeai as genai
+
+def get_gemini_api_key(filepath="~/.api-gemini"):
+    """Reads the Gemini API key from a file."""
+    try:
+        # Expand the user home directory
+        expanded_filepath = os.path.expanduser(filepath)
+        with open(expanded_filepath, 'r') as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        print(f"Error: API key file not found at {filepath}")
+        return None
+    except Exception as e:
+        print(f"Error reading API key file: {e}")
+        return None
+
+def summarize_content(content, api_key):
+    """Summarizes content using the Gemini API."""
+    if not api_key:
+        return "Summary not available: API key not found."
+
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-2.5-flash-preview-04-17')
+
+    try:
+        # Add a prompt to guide the summarization
+        prompt = "Please provide a concise summary of the following content, focusing on its main purpose and key features:\n\n" + content
+        response = model.generate_content(prompt)
+        # Check if the response has parts and join them
+        if hasattr(response, 'parts') and response.parts:
+            return "".join(part.text for part in response.parts)
+        # Fallback for responses without parts (though less common with text)
+        elif hasattr(response, 'text'):
+             return response.text
+        else:
+            return "Summary generation failed: Unexpected response format."
+    except Exception as e:
+        print(f"Error generating summary: {e}")
+        return f"Summary generation failed: {e}"
 
 def generate_llms_html(directory, output_file="llms-full.html"):
     """
@@ -56,10 +95,15 @@ def generate_llms_html(directory, output_file="llms-full.html"):
     toc_entries = []
     content_sections = []
 
+    api_key = get_gemini_api_key()
+
     # Process Markdown Files
-    html_content += "<li><a href='#markdown-files'>Markdown Files</a></li>"
-    content_sections.append("<h2 id='markdown-files'>Markdown Files</h2>")
+    markdown_section_id = 'markdown-files'
+    html_content += f"<li><a href='#{markdown_section_id}'>Markdown Files</a></li>"
+    content_sections.append(f"<h2 id='{markdown_section_id}'>Markdown Files</h2>")
     content_sections.append("<p>Comprehensive documentation of the project in Markdown format.</p>")
+    content_sections.append(f"<p><a href='#top'>Back to Table of Contents</a></p>")
+
     for filepath in markdown_files:
         content = safe_read(filepath)
         if content is None:
@@ -71,14 +115,19 @@ def generate_llms_html(directory, output_file="llms-full.html"):
         section_id = title.lower().replace(" ", "-")
         toc_entries.append(f"<li><a href='#{section_id}'>{title}</a></li>")
         content_sections.append(f"<h2 id='{section_id}'>{title}</h2>")
+        content_sections.append(f"<p><a href='#top'>Back to Table of Contents</a></p>")
 
-        # Extract summary if available
+
+        # Extract summary if available or generate using Gemini
         summary_match = re.search(r"^>\s+(.+)", content, re.MULTILINE)
         if summary_match:
             summary = summary_match.group(1).strip()
-            content_sections.append(f"<p>{summary}</p>")
+            content_sections.append(f"<p>Summary: {summary}</p>")
         else:
-            content_sections.append(f"<p>Content from: {filepath}</p>")
+            # Generate summary using Gemini
+            summary = summarize_content(content, api_key)
+            content_sections.append(f"<p>Generated Summary: {summary}</p>")
+
 
         # Remove title and summary if already written
         content_to_write = content
@@ -89,9 +138,12 @@ def generate_llms_html(directory, output_file="llms-full.html"):
         content_sections.append(f"<pre><code>{html.escape(content_to_write.strip())}</code></pre>")
 
     # Process Other Text Files
-    html_content += "<li><a href='#code-files'>Code and Other Files</a></li>"
-    content_sections.append("<h2 id='code-files'>Code and Other Files</h2>")
+    code_section_id = 'code-files'
+    html_content += f"<li><a href='#{code_section_id}'>Code and Other Files</a></li>"
+    content_sections.append(f"<h2 id='{code_section_id}'>Code and Other Files</h2>")
     content_sections.append("<p>Code snippets, scripts, and other relevant text files.</p>")
+    content_sections.append(f"<p><a href='#top'>Back to Table of Contents</a></p>")
+
     for filepath in other_text_files:
         content = safe_read(filepath)
         if content is None:
@@ -101,7 +153,12 @@ def generate_llms_html(directory, output_file="llms-full.html"):
         section_id = title.lower().replace(" ", "-")
         toc_entries.append(f"<li><a href='#{section_id}'>{title}</a></li>")
         content_sections.append(f"<h2 id='{section_id}'>{title}</h2>")
-        content_sections.append(f"<p>File: {filepath}</p>")
+        content_sections.append(f"<p><a href='#top'>Back to Table of Contents</a></p>")
+
+        # Generate summary using Gemini
+        summary = summarize_content(content, api_key)
+        content_sections.append(f"<p>Generated Summary: {summary}</p>")
+
         content_sections.append("<pre><code>{}</code></pre>".format(html.escape(content.strip())))
 
     html_content += "".join(toc_entries)
