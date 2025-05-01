@@ -25,7 +25,7 @@ def summarize_content(content, api_key):
         return "Summary not available: API key not found."
 
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-2.5-flash-preview-04-17')
+    model = genai.GenerativeModel('gemini-2.5-pro-preview-03-25')
 
     try:
         # Add a prompt to guide the summarization
