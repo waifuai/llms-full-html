@@ -1,0 +1,8 @@
+# Runtime dependencies (flexible pins suitable for OSS consumers)
+
+# Google GenAI SDK (Client-centric API)
+google-genai~=1.28
+
+# Notes:
+# - Keep only direct runtime deps here for library/app consumers.
+# - Dev/test pins are in requirements-dev.txt

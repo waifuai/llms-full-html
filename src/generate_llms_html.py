@@ -3,45 +3,85 @@ import re
 import html
 import sys
 from utils import safe_read
-import google.generativeai as genai
+from google import genai
+import httpx
+
+GEMINI_MODEL = "gemini-2.5-pro"
+_GENAI_CLIENT = None  # module-level cache
+
+def _get_client(api_key: str):
+    global _GENAI_CLIENT
+    if _GENAI_CLIENT is not None:
+        return _GENAI_CLIENT
+    # Create client with short HTTP timeout to avoid blocking generation
+    # google-genai honors httpx client options via client params
+    try:
+        _GENAI_CLIENT = genai.Client(
+            api_key=api_key,
+            http_client=httpx.Client(timeout=httpx.Timeout(10.0, connect=5.0, read=10.0, write=10.0)),
+        )
+    except Exception:
+        # Fallback without custom http client if construction fails
+        _GENAI_CLIENT = genai.Client(api_key=api_key)
+    return _GENAI_CLIENT
 
 def get_gemini_api_key(filepath="~/.api-gemini"):
-    """Reads the Gemini API key from a file."""
+    """Resolve API key from env or fallback file."""
+    # Prefer env vars
+    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    if api_key:
+        return api_key.strip()
+
+    # Fallback to key file
     try:
-        # Expand the user home directory
         expanded_filepath = os.path.expanduser(filepath)
-        with open(expanded_filepath, 'r') as f:
+        with open(expanded_filepath, "r", encoding="utf-8") as f:
             return f.read().strip()
     except FileNotFoundError:
-        print(f"Error: API key file not found at {filepath}")
+        print(f"Warning: API key not found. Set GEMINI_API_KEY/GOOGLE_API_KEY or create {filepath}")
         return None
     except Exception as e:
         print(f"Error reading API key file: {e}")
         return None
 
 def summarize_content(content, api_key):
-    """Summarizes content using the Gemini API."""
+    """Summarize content using Google GenAI SDK, with network-safe fallbacks."""
     if not api_key:
         return "Summary not available: API key not found."
 
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-2.5-pro')
+    prompt = (
+        "Provide a concise, factual summary of the following content. "
+        "Focus on purpose, key features, and important details. "
+        "Limit to 3-6 bullet points if possible.\n\n"
+    ) + content
 
     try:
-        # Add a prompt to guide the summarization
-        prompt = "Please provide a concise summary of the following content, focusing on its main purpose and key features:\n\n" + content
-        response = model.generate_content(prompt)
-        # Check if the response has parts and join them
-        if hasattr(response, 'parts') and response.parts:
-            return "".join(part.text for part in response.parts)
-        # Fallback for responses without parts (though less common with text)
-        elif hasattr(response, 'text'):
-             return response.text
-        else:
-            return "Summary generation failed: Unexpected response format."
+        client = _get_client(api_key)
+        resp = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=prompt,
+        )
+
+        # google-genai returns text via resp.text; keep a defensive fallback
+        if hasattr(resp, "text") and resp.text:
+            return resp.text
+        if hasattr(resp, "candidates") and resp.candidates:
+            for cand in resp.candidates:
+                if getattr(cand, "content", None) and getattr(cand.content, "parts", None):
+                    parts = cand.content.parts
+                    texts = [getattr(p, "text", "") for p in parts if getattr(p, "text", None)]
+                    if texts:
+                        return "".join(texts)
+        return "Summary generation failed: Empty response."
+    except (httpx.TimeoutException, httpx.HTTPError) as net_err:
+        print(f"Network issue while generating summary: {net_err}")
+        return "Summary skipped due to network timeout."
+    except KeyboardInterrupt:
+        # Ensure generation still completes even if user interrupts
+        return "Summary skipped due to interruption."
     except Exception as e:
         print(f"Error generating summary: {e}")
-        return f"Summary generation failed: {e}"
+        return "Summary skipped due to API error."
 
 def generate_llms_html(directory, output_file="llms-full.html"):
     """
