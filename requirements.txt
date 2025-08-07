@@ -2,6 +2,8 @@
 
 # Google GenAI SDK (Client-centric API)
 google-genai~=1.28
+# HTTP client for OpenRouter integration
+requests>=2.32.0,<3
 
 # Notes:
 # - Keep only direct runtime deps here for library/app consumers.

@@ -5,8 +5,34 @@ import sys
 from utils import safe_read
 from google import genai
 import httpx
+import json
+from pathlib import Path
+from typing import Optional
+import requests
 
-GEMINI_MODEL = "gemini-2.5-pro"
+# Provider selection: default to OpenRouter; allow override via env
+DEFAULT_PROVIDER = os.environ.get("GEN_PROVIDER", "openrouter").strip().lower() or "openrouter"
+
+# Model config via files in home directory
+OPENROUTER_MODEL_FILE = Path.home() / ".model-openrouter"
+GEMINI_MODEL_FILE = Path.home() / ".model-gemini"
+
+def _read_single_line_file(path: Path) -> Optional[str]:
+    try:
+        if path.is_file():
+            value = path.read_text(encoding="utf-8").strip()
+            return value or None
+    except Exception:
+        return None
+    return None
+
+def _resolve_openrouter_model() -> str:
+    return _read_single_line_file(OPENROUTER_MODEL_FILE) or "openrouter/horizon-beta"
+
+def _resolve_gemini_model() -> str:
+    return _read_single_line_file(GEMINI_MODEL_FILE) or "gemini-2.5-pro"
+
+GEMINI_MODEL = _resolve_gemini_model()
 _GENAI_CLIENT = None  # module-level cache
 
 def _get_client(api_key: str):
@@ -44,25 +70,33 @@ def get_gemini_api_key(filepath="~/.api-gemini"):
         print(f"Error reading API key file: {e}")
         return None
 
-def summarize_content(content, api_key):
-    """Summarize content using Google GenAI SDK, with network-safe fallbacks."""
+def _resolve_openrouter_api_key() -> Optional[str]:
+    env_key = os.getenv("OPENROUTER_API_KEY")
+    if env_key and env_key.strip():
+        return env_key.strip()
+    try:
+        key_file = Path.home() / ".api-openrouter"
+        if key_file.is_file():
+            return key_file.read_text(encoding="utf-8").strip() or None
+    except Exception:
+        pass
+    return None
+
+def _build_summary_prompt(content: str) -> str:
+    return (
+        "Provide a concise, factual summary of the following content.\n"
+        "Focus on purpose, key features, and important details.\n"
+        "Limit to 3-6 bullet points.\n\n"
+        f"{content}"
+    )
+
+def summarize_with_gemini(content: str, api_key: Optional[str]) -> str:
     if not api_key:
-        return "Summary not available: API key not found."
-
-    prompt = (
-        "Provide a concise, factual summary of the following content. "
-        "Focus on purpose, key features, and important details. "
-        "Limit to 3-6 bullet points if possible.\n\n"
-    ) + content
-
+        return "Summary not available: Gemini API key not found."
+    prompt = _build_summary_prompt(content)
     try:
         client = _get_client(api_key)
-        resp = client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=prompt,
-        )
-
-        # google-genai returns text via resp.text; keep a defensive fallback
+        resp = client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
         if hasattr(resp, "text") and resp.text:
             return resp.text
         if hasattr(resp, "candidates") and resp.candidates:
@@ -72,16 +106,66 @@ def summarize_content(content, api_key):
                     texts = [getattr(p, "text", "") for p in parts if getattr(p, "text", None)]
                     if texts:
                         return "".join(texts)
-        return "Summary generation failed: Empty response."
+        return "Summary generation failed: Empty Gemini response."
     except (httpx.TimeoutException, httpx.HTTPError) as net_err:
-        print(f"Network issue while generating summary: {net_err}")
-        return "Summary skipped due to network timeout."
+        print(f"Network issue while generating summary (Gemini): {net_err}")
+        return "Summary skipped due to Gemini network timeout."
     except KeyboardInterrupt:
-        # Ensure generation still completes even if user interrupts
         return "Summary skipped due to interruption."
     except Exception as e:
-        print(f"Error generating summary: {e}")
-        return "Summary skipped due to API error."
+        print(f"Error generating summary (Gemini): {e}")
+        return "Summary skipped due to Gemini API error."
+
+def summarize_with_openrouter(content: str, model_name: Optional[str] = None, timeout: int = 60) -> Optional[str]:
+    api_key = _resolve_openrouter_api_key()
+    if not api_key:
+        return None
+    model = model_name or _resolve_openrouter_model()
+    payload = {
+        "model": model,
+        "messages": [{"role": "user", "content": _build_summary_prompt(content)}],
+        "temperature": 0.2,
+    }
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    try:
+        resp = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=timeout)
+        if resp.status_code != 200:
+            print(f"OpenRouter non-200: {resp.status_code} {resp.text[:400]}")
+            return None
+        data = resp.json()
+        choices = data.get("choices", [])
+        if not choices:
+            return None
+        content_text = (choices[0].get("message", {}).get("content") or "").strip()
+        return content_text or None
+    except requests.Timeout:
+        print("OpenRouter timeout")
+        return None
+    except Exception as e:
+        print(f"OpenRouter error: {e}")
+        return None
+
+def summarize_content(content: str, api_key_gemini: Optional[str]):
+    """
+    Provider-agnostic summary. Default provider is OpenRouter, fallback to Gemini, then message.
+    """
+    provider = DEFAULT_PROVIDER
+    if provider == "openrouter":
+        summary = summarize_with_openrouter(content)
+        if summary:
+            return summary
+        # fallback to Gemini
+        return summarize_with_gemini(content, api_key_gemini)
+    elif provider == "gemini":
+        return summarize_with_gemini(content, api_key_gemini)
+    # Unknown provider: try openrouter then gemini
+    summary = summarize_with_openrouter(content)
+    if summary:
+        return summary
+    return summarize_with_gemini(content, api_key_gemini)
 
 def generate_llms_html(directory, output_file="llms-full.html"):
     """
@@ -164,7 +248,7 @@ def generate_llms_html(directory, output_file="llms-full.html"):
             summary = summary_match.group(1).strip()
             content_sections.append(f"<p>Summary: {summary}</p>")
         else:
-            # Generate summary using Gemini
+            # Generate summary using selected provider (default OpenRouter; fallback Gemini)
             summary = summarize_content(content, api_key)
             content_sections.append(f"<p>Generated Summary: {summary}</p>")
 
