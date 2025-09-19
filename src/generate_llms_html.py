@@ -27,7 +27,7 @@ def _read_single_line_file(path: Path) -> Optional[str]:
     return None
 
 def _resolve_openrouter_model() -> str:
-    return _read_single_line_file(OPENROUTER_MODEL_FILE) or "openrouter/horizon-beta"
+    return _read_single_line_file(OPENROUTER_MODEL_FILE) or "deepseek/deepseek-chat-v3-0324:free"
 
 def _resolve_gemini_model() -> str:
     return _read_single_line_file(GEMINI_MODEL_FILE) or "gemini-2.5-pro"
