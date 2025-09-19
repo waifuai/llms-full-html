@@ -1,3 +1,27 @@
+"""
+LLMs Full HTML Generator
+
+This module generates comprehensive HTML documentation from a directory structure containing
+Markdown files and other text files. It processes the entire directory tree, extracts content
+from supported file types, generates AI-powered summaries using either OpenRouter or Google
+Gemini APIs, and creates a navigable HTML document with table of contents and formatted content.
+
+Key features:
+- Processes Markdown (.md) and text files (.txt, .py, .js, .html, etc.)
+- Generates AI summaries using configurable LLM providers (OpenRouter/Gemini)
+- Creates clickable table of contents for easy navigation
+- Preserves code formatting and file structure
+- Supports multiple API providers with fallback mechanisms
+- Configurable via environment variables and model files
+
+Usage:
+    python -m src.generate_llms_html [directory] [output_file]
+
+Environment variables:
+- GEN_PROVIDER: API provider to use (openrouter/gemini)
+- GEMINI_API_KEY or GOOGLE_API_KEY: Gemini API key
+- OPENROUTER_API_KEY: OpenRouter API key
+"""
 import os
 import re
 import html

@@ -1,3 +1,25 @@
+"""
+Test Suite Module
+
+This module contains comprehensive unit tests for the LLMs HTML generator project.
+It includes tests for utility functions, file processing, HTML generation, and AI
+summarization functionality with proper mocking of external dependencies.
+
+Test coverage includes:
+- safe_read() function with various encoding scenarios and edge cases
+- CODE_EXTENSIONS constant validation
+- HTML generation functionality with mocked API calls
+- Provider fallback mechanisms (OpenRouter to Gemini)
+- Error handling for missing API keys and network issues
+- Empty directory processing
+- Binary file handling
+
+The tests use unittest framework with mocking to isolate external dependencies
+like API calls, ensuring reliable and fast test execution without requiring
+actual API keys or network connectivity.
+
+Run tests with: python -m unittest src.tests.test_suite
+"""
 import os
 import shutil
 import tempfile

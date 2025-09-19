@@ -1,3 +1,19 @@
+"""
+Utility Functions Module
+
+This module provides common utility functions and constants used across the LLMs HTML
+generator project. It contains helper functions for safe file reading with encoding
+fallback and defines comprehensive file extension constants for identifying different
+types of code and text files.
+
+Key components:
+- safe_read(): Robust file reading function with UTF-8/Latin-1 encoding fallback
+- CODE_EXTENSIONS: Comprehensive tuple of file extensions for various programming
+  languages, markup formats, and text files supported by the project
+
+These utilities are used by the main HTML generation module to process different
+file types and handle encoding issues gracefully.
+"""
 import os
 
 # Common file extensions for code and text files.
