@@ -1,0 +1,6 @@
+{
+  "title": "LLMs-Full HTML Generator for AI Documentation",
+  "link": "./llms-full-html",
+  "description": "Unlock the power of Large Language Models with the LLMs-Full HTML Generator! 🚀 This innovative Python tool crafts comprehensive `llms-full.html` files, seamlessly aggregating full project documentation, code snippets, and AI-generated summaries into a single, structured HTML format. Designed to overcome LLM context limitations, it enhances content accessibility for AI ingestion, complementing standards like sitemap.xml. Key highlights include efficient content consolidation 📊, OpenRouter-powered summarization via Google GenAI SDK for concise overviews 🤖, and simple utilities for streamlined processing. Perfect for developers aiming to make websites and repos more AI-friendly, it supports easy setup with Python 3.9+, virtual environments, and secure API key handling. Generate your AI-optimized docs in one command and revolutionize how models interact with your projects—boosting discoverability and usability in the AI era! (132 words)",
+  "description_small": "Generate llms-full.html files to supercharge LLM access to project docs! 🤖 Aggregates full documentation & code into one AI-friendly HTML. 📄 Uses OpenRouter summaries for easy ingestion, overcoming context limits. 🚀 Efficient & simple! 💡"
+}

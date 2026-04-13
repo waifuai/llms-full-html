@@ -1,8 +1,6 @@
 # Runtime dependencies (flexible pins suitable for OSS consumers)
 
-# Google GenAI SDK (Client-centric API)
-google-genai~=1.28
-# HTTP client for OpenRouter integration
+# HTTP client for OpenRouter API
 requests>=2.32.0,<3
 
 # Notes:

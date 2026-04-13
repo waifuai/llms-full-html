@@ -11,7 +11,7 @@ This repository provides a Python script to generate `llms-full.html` files—a 
 - **Comprehensive Content:** Combines full documentation and code.
 - **AI-Friendly Format:** Uses HTML to keep the content simple and structured, with generated summaries for easier AI ingestion.
 - **Efficient Processing:** Consolidates all relevant content to help overcome LLM context limitations.
-- **Gemini Summarization:** Uses the Google GenAI SDK to summarize file content via `genai.Client`.
+- **OpenRouter Summarization:** Uses the OpenRouter chat completions API to summarize file content.
 
 ## Repository Structure
 - **README.md:** Project overview and usage instructions.
@@ -24,9 +24,9 @@ This repository provides a Python script to generate `llms-full.html` files—a 
 ### Prerequisites
 
 - Python 3.9+
-- A Gemini API key provided via one of:
-  - Environment variable `GEMINI_API_KEY` (preferred) or `GOOGLE_API_KEY`
-  - Fallback file `~/.api-gemini` containing the key as a single line
+- An OpenRouter API key provided via one of:
+  - Environment variable `OPENROUTER_API_KEY`
+  - Fallback file `~/.api-openrouter` containing the key as a single line
 
 ### Installation
 
@@ -59,7 +59,7 @@ This repository provides a Python script to generate `llms-full.html` files—a 
 
 ### Notes on Authentication
 
-The tool will first look for `GEMINI_API_KEY` or `GOOGLE_API_KEY` in the environment. If not set, it falls back to reading `~/.api-gemini`. Without a key, summaries will be skipped with a warning.
+The tool will first look for `OPENROUTER_API_KEY` in the environment. If not set, it falls back to reading `~/.api-openrouter`. Without a key, summaries will be skipped (returning None).
 
 ## License
 

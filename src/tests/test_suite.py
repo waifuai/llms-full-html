@@ -9,7 +9,7 @@ Test coverage includes:
 - safe_read() function with various encoding scenarios and edge cases
 - CODE_EXTENSIONS constant validation
 - HTML generation functionality with mocked API calls
-- Provider fallback mechanisms (OpenRouter to Gemini)
+- OpenRouter summarization
 - Error handling for missing API keys and network issues
 - Empty directory processing
 - Binary file handling
@@ -35,11 +35,10 @@ from utils import safe_read, CODE_EXTENSIONS
 # Import the main module functions for testing
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 try:
-    from generate_llms_html import generate_llms_html, get_gemini_api_key, summarize_content
+    from generate_llms_html import generate_llms_html, summarize_content
 except ImportError:
     # Handle import gracefully if dependencies are not available
     generate_llms_html = None
-    get_gemini_api_key = None
     summarize_content = None
 
 class TestSafeRead(unittest.TestCase):
@@ -120,11 +119,9 @@ class TestGenerateLLMsHTML(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.test_dir)
 
-    @patch('generate_llms_html.get_gemini_api_key')
     @patch('generate_llms_html.summarize_content')
-    def test_generate_llms_html_basic(self, mock_summarize, mock_get_key):
+    def test_generate_llms_html_basic(self, mock_summarize):
         """Test basic HTML generation functionality"""
-        mock_get_key.return_value = None  # No API key
         mock_summarize.return_value = "Mocked summary"
 
         generate_llms_html(self.test_dir, self.output_file)
@@ -158,38 +155,26 @@ class TestGenerateLLMsHTML(unittest.TestCase):
 
 @unittest.skipIf(generate_llms_html is None, "Main module not available")
 class TestAsyncFunctionality(unittest.TestCase):
-    """Test async functionality for AI summarization"""
+    """Test functionality for AI summarization"""
 
     def setUp(self):
         self.test_content = "This is test content for summarization."
-
-    @patch('generate_llms_html.summarize_with_openrouter')
-    @patch('generate_llms_html.get_gemini_api_key')
-    def test_summarize_content_fallback(self, mock_get_key, mock_openrouter):
-        """Test summarization fallback mechanism"""
-        mock_get_key.return_value = "test_key"
-        mock_openrouter.return_value = None  # OpenRouter fails
-
-        with patch('generate_llms_html.summarize_with_gemini') as mock_gemini:
-            mock_gemini.return_value = "Gemini summary"
-
-            result = summarize_content(self.test_content, "test_key")
-            self.assertEqual(result, "Gemini summary")
-            mock_openrouter.assert_called_once()
-            mock_gemini.assert_called_once()
 
     @patch('generate_llms_html.summarize_with_openrouter')
     def test_summarize_content_openrouter_success(self, mock_openrouter):
         """Test successful OpenRouter summarization"""
         mock_openrouter.return_value = "OpenRouter summary"
 
-        result = summarize_content(self.test_content, None)
+        result = summarize_content(self.test_content)
         self.assertEqual(result, "OpenRouter summary")
 
-    def test_summarize_content_no_api_key(self):
-        """Test summarization when no API key is available"""
-        result = summarize_content(self.test_content, None)
-        self.assertIn("Summary not available", result)
+    @patch('generate_llms_html.summarize_with_openrouter')
+    def test_summarize_content_openrouter_failure(self, mock_openrouter):
+        """Test summarization when OpenRouter fails"""
+        mock_openrouter.return_value = None
+
+        result = summarize_content(self.test_content)
+        self.assertIsNone(result)
 
 if __name__ == "__main__":
     unittest.main()
