@@ -1,8 +1,2 @@
-# Runtime dependencies (flexible pins suitable for OSS consumers)
-
-# HTTP client for OpenRouter API
-requests>=2.32.0,<3
-
-# Notes:
-# - Keep only direct runtime deps here for library/app consumers.
-# - Dev/test pins are in requirements-dev.txt
+# requests>=2.32.0,<3
+requests==2.33.1
